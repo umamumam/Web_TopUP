@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import { 
-    TrendingUp, 
     ShoppingCart, 
-    Gamepad2, 
-    Package, 
     Clock, 
     CheckCircle2 
 } from 'lucide-vue-next';
@@ -53,6 +50,7 @@ const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
     return {
         dayName: days[date.getDay()],
         dayNum: date.getDate(),
@@ -82,6 +80,7 @@ const monthlyOptions = {
     xaxis: {
         categories: props.chartData.monthly.map(d => {
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
             return months[d.month - 1];
         }),
         axisBorder: { show: false },

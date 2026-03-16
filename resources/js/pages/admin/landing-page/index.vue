@@ -69,6 +69,7 @@ const submitPopular = () => {
 
 const toggleGame = (id: number) => {
     const index = popularForm.game_ids.indexOf(id);
+
     if (index > -1) {
         popularForm.game_ids.splice(index, 1);
     } else {
