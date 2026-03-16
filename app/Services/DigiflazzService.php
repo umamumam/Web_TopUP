@@ -76,39 +76,34 @@ class DigiflazzService
         return $this->placeOrder($sku, $target, $refId, $server);
     }
 
-    public function checkId($target, $sku)
+    public function checkIdWithRef($target, $sku, $refId)
     {
-        $refId = 'CHECK-' . uniqid();
         $sign = md5($this->username . $this->apiKey . $refId);
 
         $payload = [
-            'username' => $this->username,
+            'username'       => $this->username,
             'buyer_sku_code' => $sku,
-            'customer_no' => $target,
-            'ref_id' => $refId,
-            'sign' => $sign,
-            'commands' => 'inquiry-game'
+            'customer_no'    => $target,
+            'ref_id'         => $refId,
+            'sign'           => $sign,
+            'commands'       => 'inquiry-game'
         ];
 
-        Log::info('[Digiflazz] checkId REQUEST', [
-            'url' => $this->baseUrl . '/transaction',
-            'sku' => $sku,
-            'customer_no' => $target,
-            'ref_id' => $refId,
-            'sign' => $sign,
-        ]);
-
         try {
-            $response = Http::timeout(15)->post($this->baseUrl . '/transaction', $payload);
+            $response = Http::timeout(10)->post($this->baseUrl . '/transaction', $payload);
             $json = $response->json();
-            Log::info('[Digiflazz] checkId RESPONSE', [
-                'http_status' => $response->status(),
-                'body' => $json,
-            ]);
+            Log::info('[Digiflazz] checkIdWithRef RESPONSE', ['body' => $json]);
             return $json;
         } catch (\Exception $e) {
-            Log::error('[Digiflazz] checkId ERROR', ['message' => $e->getMessage()]);
+            Log::error('[Digiflazz] checkIdWithRef ERROR', ['message' => $e->getMessage()]);
             return null;
         }
+    }
+
+    // Update checkId untuk pakai method baru
+    public function checkId($target, $sku)
+    {
+        $refId = 'CHECK-' . uniqid();
+        return $this->checkIdWithRef($target, $sku, $refId);
     }
 }

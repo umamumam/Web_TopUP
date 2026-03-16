@@ -224,78 +224,72 @@ class TopupController extends Controller
         $game = Game::where('slug', $request->game_slug)->first();
         if (!$game) return response()->json(['success' => false, 'message' => 'Game tidak ditemukan']);
 
-        // Cari produk yang khusus untuk pengecekan (biasanya ada kata 'Cek' atau 'Inquiry')
         $product = Product::where('game_id', $game->id)
             ->where(function ($q) {
                 $q->where('name', 'LIKE', '%Cek%')
                     ->orWhere('name', 'LIKE', '%Inquiry%');
-            })
-            ->first();
+            })->first();
 
-        // Jika tidak ada produk khusus cek, ambil produk pertama sebagai fallback
         if (!$product) {
-            $product = Product::where('game_id', $game->id)->first();
+            return response()->json(['success' => false, 'message' => 'Produk cek ID tidak tersedia']);
         }
 
-        if (!$product) return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan']);
-
-        // Gabungkan target_id dan server_id
         $customerNo = $request->server_id
             ? $request->target_id . $request->server_id
             : $request->target_id;
 
-        Log::info('[ValidateId] Checking', [
-            'game' => $game->slug,
-            'sku' => $product->sku,
-            'customer_no' => $customerNo,
-        ]);
+        // Kirim request pertama
+        $refId = 'CHECK-' . uniqid();
+        $response = $digiflazz->checkIdWithRef($customerNo, $product->sku, $refId);
 
-        $response = $digiflazz->checkId($customerNo, $product->sku);
-
-        // Handle null (timeout/error)
         if (is_null($response)) {
-            return response()->json(['success' => false, 'message' => 'Koneksi ke provider gagal, coba lagi.']);
+            return response()->json(['success' => false, 'message' => 'Koneksi ke provider gagal']);
         }
 
-        if (isset($response['data'])) {
-            $data = $response['data'];
-            Log::info('[ValidateId] Data', $data);
+        $data = $response['data'] ?? null;
+        if (!$data) {
+            return response()->json(['success' => false, 'message' => 'Response tidak dikenali']);
+        }
 
-            // rc '00' = sukses
-            if (isset($data['rc']) && $data['rc'] === '00') {
-                // Data username ada di 'sn', bukan 'customer_name'
-                $rawName = $data['sn'] ?? $data['customer_name'] ?? '';
-                $username = $rawName;
-                $region = '';
+        // Jika rc 03 (pending), polling maksimal 5x dengan jeda 2 detik
+        $maxRetry = 5;
+        $attempt = 0;
+        while (($data['rc'] === '03' || empty($data['sn'])) && $attempt < $maxRetry) {
+            sleep(2);
+            $attempt++;
+            Log::info('[ValidateId] Polling attempt ' . $attempt, ['ref_id' => $refId]);
 
-                // Format: "User ID xxx Zone xxx / Username xxx / Region = ID"
-                $parts = explode('/', $rawName);
+            $retry = $digiflazz->checkIdWithRef($customerNo, $product->sku, $refId);
+            if (isset($retry['data'])) {
+                $data = $retry['data'];
+            }
+        }
 
-                foreach ($parts as $part) {
-                    $part = trim($part);
-                    if (stripos($part, 'Username ') === 0) {
-                        $username = trim(str_ireplace('Username ', '', $part));
-                        $username = urldecode(str_replace('+', ' ', $username));
-                    } elseif (stripos($part, 'Region =') === 0) {
-                        $region = trim(str_ireplace('Region =', '', $part));
-                    }
+        // Parse hasil akhir
+        if (isset($data['rc']) && $data['rc'] === '00' && !empty($data['sn'])) {
+            $rawName = $data['sn'];
+            $username = $rawName;
+            $region = '';
+
+            $parts = explode('/', $rawName);
+            foreach ($parts as $part) {
+                $part = trim($part);
+                if (stripos($part, 'Username ') === 0) {
+                    $username = trim(str_ireplace('Username ', '', $part));
+                    $username = urldecode(str_replace('+', ' ', $username));
+                } elseif (stripos($part, 'Region =') === 0) {
+                    $region = trim(str_ireplace('Region =', '', $part));
                 }
-
-                return response()->json([
-                    'success' => true,
-                    'username' => $username,
-                    'region' => $region,
-                    'full_data' => $rawName
-                ]);
             }
 
-            // rc lain = error
-            $msg = $data['message'] ?? ($data['msg'] ?? 'ID tidak valid atau layanan sedang gangguan');
-            return response()->json(['success' => false, 'message' => $msg]);
+            return response()->json([
+                'success' => true,
+                'username' => $username,
+                'region' => $region,
+                'full_data' => $rawName
+            ]);
         }
 
-        // Response tidak ada 'data' key
-        Log::warning('[ValidateId] Unexpected response', $response ?? []);
-        return response()->json(['success' => false, 'message' => 'Response tidak dikenali dari provider']);
+        return response()->json(['success' => false, 'message' => 'ID tidak valid atau tidak ditemukan']);
     }
 }
