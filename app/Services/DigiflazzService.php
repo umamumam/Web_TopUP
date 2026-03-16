@@ -50,6 +50,12 @@ class DigiflazzService
         $customerNo = $server ? $target . $server : $target;
         $sign = md5($this->username . $this->apiKey . $refId);
 
+        Log::info('[Digiflazz] placeOrder ATTEMPT', [
+            'sku' => $sku,
+            'customer_no' => $customerNo,
+            'ref_id' => $refId
+        ]);
+
         $response = Http::post($this->baseUrl . '/transaction', [
             'username' => $this->username,
             'buyer_sku_code' => $sku,
@@ -58,7 +64,10 @@ class DigiflazzService
             'sign' => $sign
         ]);
 
-        return $response->json();
+        $json = $response->json();
+        Log::info('[Digiflazz] placeOrder RESPONSE', $json ?? []);
+
+        return $json;
     }
 
     public function checkStatus($sku, $target, $refId, $server = null)

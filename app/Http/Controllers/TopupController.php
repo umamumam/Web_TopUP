@@ -142,24 +142,40 @@ class TopupController extends Controller
 
     public function refreshStatus($reference_id, MidtransService $midtrans, DigiflazzService $digiflazz)
     {
-        $order = Order::with(['product', 'paymentMethod'])->where('reference_id', $reference_id)->firstOrFail();
+        $this->syncOrder($reference_id, $midtrans, $digiflazz);
+        return back();
+    }
 
-        // 1. If not paid yet, check Midtrans
+    public function getAjaxStatus($reference_id, MidtransService $midtrans, DigiflazzService $digiflazz)
+    {
+        $order = $this->syncOrder($reference_id, $midtrans, $digiflazz);
+        return response()->json([
+            'status' => $order->status,
+            'payment_status' => $order->payment_status,
+            'sn' => $order->sn,
+            'nickname' => $order->nickname
+        ]);
+    }
+
+    private function syncOrder($reference_id, $midtrans, $digiflazz)
+    {
+        $order = Order::with(['product'])->where('reference_id', $reference_id)->firstOrFail();
+
+        // 1. Check Midtrans if not paid
         if ($order->payment_status !== 'paid') {
             try {
                 $status = (object) $midtrans->getTransactionStatus($reference_id);
                 $transaction = $status->transaction_status;
-
                 if ($transaction == 'settlement' || $transaction == 'capture') {
                     app(CallbackController::class)->processPaidOrder($order, $digiflazz);
-                    return back()->with('success', 'Pembayaran terverifikasi!');
+                    $order->refresh();
                 }
             } catch (\Exception $e) {
-                Log::error('RefreshStatus Midtrans Error: ' . $e->getMessage());
+                Log::error('Sync Midtrans Error: ' . $e->getMessage());
             }
         }
 
-        // 2. If already paid but Digiflazz status is not success/failed, check Digiflazz
+        // 2. Check Digiflazz if paid but pending
         if ($order->payment_status === 'paid' && !in_array($order->status, ['success', 'failed'])) {
             try {
                 $response = $digiflazz->checkStatus(
@@ -171,26 +187,23 @@ class TopupController extends Controller
 
                 if (isset($response['data'])) {
                     $item = $response['data'];
-                    
                     // Map status
                     $newStatus = strtolower($item['status'] ?? 'pending');
-                    if ($newStatus === 'sukses') $newStatus = 'success';
-                    if ($newStatus === 'gagal') $newStatus = 'failed';
+                    if ($newStatus === 'sukses' || $newStatus === 'success') $newStatus = 'success';
+                    if ($newStatus === 'gagal' || $newStatus === 'failed') $newStatus = 'failed';
 
                     $order->update([
                         'status' => $newStatus,
                         'sn' => $item['sn'] ?? $order->sn,
                         'provider_payload' => json_encode($item)
                     ]);
-
-                    return back()->with('success', 'Status pesanan diperbarui!');
                 }
             } catch (\Exception $e) {
-                Log::error('RefreshStatus Digiflazz Error: ' . $e->getMessage());
+                Log::error('Sync Digiflazz Error: ' . $e->getMessage());
             }
         }
 
-        return back();
+        return $order;
     }
 
     public function validateId(Request $request, DigiflazzService $digiflazz)

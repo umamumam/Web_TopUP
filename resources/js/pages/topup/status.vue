@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
+import axios from 'axios';
 import { CheckCircle2, XCircle, Clock, Copy, Smartphone, MessageSquare, RefreshCw } from 'lucide-vue-next';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { home } from '@/routes';
@@ -9,23 +10,49 @@ const props = defineProps<{
 }>();
 
 const isRefreshing = ref(false);
+const orderData = ref({ ...props.order });
 
-const refresh = () => {
-    isRefreshing.value = true;
-    router.post(`/topup/status/${props.order.reference_id}/refresh`, {}, {
-        onFinish: () => {
+const refresh = async (isManual = false) => {
+    if (isRefreshing.value && !isManual) {
+        return;
+    }
+    
+    if (isManual === true) {
+        isRefreshing.value = true;
+    }
+
+    try {
+        const response = await axios.get(`/topup/status/${orderData.value.reference_id}/api`);
+        
+        // Update reactive data
+        orderData.value.status = response.data.status;
+        orderData.value.payment_status = response.data.payment_status;
+        orderData.value.sn = response.data.sn;
+        orderData.value.nickname = response.data.nickname;
+
+        // If finished, clear interval
+        if (['success', 'failed'].includes(orderData.value.status) && orderData.value.payment_status === 'paid') {
+            if (interval) {
+                clearInterval(interval);
+                interval = null;
+            }
+        }
+    } catch (error) {
+        console.error('Polling error:', error);
+    } finally {
+        if (isManual === true) {
             isRefreshing.value = false;
         }
-    });
+    }
 };
 
-// Auto refresh every 10 seconds if still pending
+// Auto refresh every 3 seconds
 let interval: any = null;
 onMounted(() => {
-    if (props.order.payment_status === 'unpaid' || props.order.status === 'pending') {
+    if (orderData.value.payment_status !== 'paid' || !['success', 'failed'].includes(orderData.value.status)) {
         interval = setInterval(() => {
-            refresh();
-        }, 10000);
+            refresh(false);
+        }, 3000);
     }
 });
 
@@ -71,7 +98,7 @@ const copyToClipboard = (text: string) => {
                 <!-- Status Header -->
                 <div class="p-8 text-center border-b border-slate-800 bg-slate-800/50 relative">
                     <button 
-                        @click="refresh" 
+                        @click="refresh(true)" 
                         :disabled="isRefreshing"
                         class="absolute top-6 right-6 p-3 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-all active:scale-95 disabled:opacity-50 group"
                         title="Perbarui Status"
@@ -79,13 +106,13 @@ const copyToClipboard = (text: string) => {
                         <RefreshCw class="w-5 h-5" :class="isRefreshing ? 'animate-spin text-indigo-500' : 'text-slate-400 group-hover:rotate-180 transition-transform duration-500'" />
                     </button>
 
-                    <component :is="getStatusIcon(order.status)" class="w-20 h-20 mx-auto mb-6" :class="getStatusColor(order.status)" />
+                    <component :is="getStatusIcon(orderData.status)" class="w-20 h-20 mx-auto mb-6" :class="getStatusColor(orderData.status)" />
                     <h1 class="text-3xl font-extrabold uppercase tracking-tight mb-2">
-                        Status: {{ order.status.toUpperCase() }}
+                        Status: {{ orderData.status.toUpperCase() }}
                     </h1>
-                    <p class="text-slate-400 font-medium">No. Pesanan: {{ order.reference_id }}</p>
+                    <p class="text-slate-400 font-medium">No. Pesanan: {{ orderData.reference_id }}</p>
                     
-                    <div v-if="order.payment_status === 'unpaid'" class="mt-4 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl inline-flex items-center gap-2">
+                    <div v-if="orderData.payment_status !== 'paid'" class="mt-4 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl inline-flex items-center gap-2">
                         <div class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
                         <span class="text-[10px] font-black uppercase tracking-widest text-indigo-400">Menunggu Pembayaran</span>
                     </div>
@@ -97,11 +124,11 @@ const copyToClipboard = (text: string) => {
                     <!-- Game Info Card -->
                     <div class="flex items-center gap-5 p-5 bg-gradient-to-r from-slate-800 to-slate-800/40 rounded-3xl border border-slate-700/50 shadow-inner">
                         <div class="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 rounded-2xl overflow-hidden flex-shrink-0 shadow-lg border border-slate-700">
-                            <img :src="order.game.thumbnail" class="w-full h-full object-cover scale-110" />
+                            <img :src="orderData.game.thumbnail" class="w-full h-full object-cover scale-110" />
                         </div>
                         <div>
-                            <h3 class="font-black text-lg sm:text-xl uppercase tracking-tight text-slate-100">{{ order.game.name }}</h3>
-                            <p class="text-indigo-400 text-[11px] sm:text-sm font-bold mt-1 tracking-widest uppercase">{{ order.product.name }}</p>
+                            <h3 class="font-black text-lg sm:text-xl uppercase tracking-tight text-slate-100">{{ orderData.game.name }}</h3>
+                            <p class="text-indigo-400 text-[11px] sm:text-sm font-bold mt-1 tracking-widest uppercase">{{ orderData.product.name }}</p>
                         </div>
                     </div>
 
@@ -111,38 +138,38 @@ const copyToClipboard = (text: string) => {
                         <div class="flex justify-between items-center py-3 border-b border-slate-800/80 border-dashed">
                             <span class="text-slate-500 text-[11px] sm:text-xs font-black uppercase tracking-widest">ID Tujuan</span>
                             <div class="flex items-center gap-3">
-                                <span class="font-bold text-slate-200 text-sm">{{ order.target_id }}{{ order.server_id ? ' (' + order.server_id + ')' : '' }}</span>
-                                <button @click="copyToClipboard(order.target_id + (order.server_id ? order.server_id : ''))" class="text-slate-500 hover:text-indigo-400 transition-colors p-1 bg-slate-800 rounded-md">
+                                <span class="font-bold text-slate-200 text-sm">{{ orderData.target_id }}{{ orderData.server_id ? ' (' + orderData.server_id + ')' : '' }}</span>
+                                <button @click="copyToClipboard(orderData.target_id + (orderData.server_id ? orderData.server_id : ''))" class="text-slate-500 hover:text-indigo-400 transition-colors p-1 bg-slate-800 rounded-md">
                                     <Copy class="w-3.5 h-3.5" />
                                 </button>
                             </div>
                         </div>
                         
-                        <div v-if="order.nickname" class="flex justify-between items-center py-3 border-b border-slate-800/80 border-dashed">
+                        <div v-if="orderData.nickname" class="flex justify-between items-center py-3 border-b border-slate-800/80 border-dashed">
                             <span class="text-slate-500 text-[11px] sm:text-xs font-black uppercase tracking-widest">Nama Akun</span>
-                            <span class="font-bold text-emerald-400 text-sm">{{ order.nickname }}</span>
+                            <span class="font-bold text-emerald-400 text-sm">{{ orderData.nickname }}</span>
                         </div>
                         
                         <div class="flex justify-between items-center py-3 border-b border-slate-800/80 border-dashed">
                             <span class="text-slate-500 text-[11px] sm:text-xs font-black uppercase tracking-widest">Metode Bayar</span>
                             <span class="font-black uppercase text-slate-200 text-sm flex items-center gap-2">
-                                <span v-if="order.payment_method" class="w-2 h-2 rounded-full bg-indigo-500"></span>
-                                {{ order.payment_method?.name || 'Menunggu API' }}
+                                <span v-if="orderData.payment_method" class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                {{ orderData.payment_method?.name || 'Menunggu API' }}
                             </span>
                         </div>
                         
                         <div class="flex justify-between items-center py-3 border-b border-slate-800/80 border-dashed">
                             <span class="text-slate-500 text-[11px] sm:text-xs font-black uppercase tracking-widest">Status Bayar</span>
-                            <span class="font-black uppercase px-3 py-1 rounded-lg text-[10px] tracking-widest" :class="order.payment_status === 'paid' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'">
-                                {{ order.payment_status === 'paid' ? 'LUNAS' : order.payment_status }}
+                            <span class="font-black uppercase px-3 py-1 rounded-lg text-[10px] tracking-widest" :class="orderData.payment_status === 'paid' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'">
+                                {{ orderData.payment_status === 'paid' ? 'LUNAS' : orderData.payment_status }}
                             </span>
                         </div>
                         
-                        <div v-if="order.sn" class="flex justify-between items-center py-3 border-b border-slate-800/80 border-dashed">
+                        <div v-if="orderData.sn" class="flex justify-between items-center py-3 border-b border-slate-800/80 border-dashed">
                             <span class="text-slate-500 text-[11px] sm:text-xs font-black uppercase tracking-widest">SN / Voucher</span>
                             <div class="flex items-center gap-3">
-                                <span class="font-mono text-indigo-400 font-bold text-sm">{{ order.sn }}</span>
-                                <button @click="copyToClipboard(order.sn)" class="text-slate-500 hover:text-indigo-400 transition-colors p-1 bg-slate-800 rounded-md">
+                                <span class="font-mono text-indigo-400 font-bold text-sm">{{ orderData.sn }}</span>
+                                <button @click="copyToClipboard(orderData.sn)" class="text-slate-500 hover:text-indigo-400 transition-colors p-1 bg-slate-800 rounded-md">
                                     <Copy class="w-3.5 h-3.5" />
                                 </button>
                             </div>
@@ -156,7 +183,7 @@ const copyToClipboard = (text: string) => {
 
                             <span class="text-slate-400 font-black uppercase tracking-widest text-xs">Total Pembayaran</span>
                             <span class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 tracking-tighter">
-                                Rp {{ parseFloat(order.total_amount).toLocaleString('id-ID') }}
+                                Rp {{ parseFloat(orderData.total_amount).toLocaleString('id-ID') }}
                             </span>
                         </div>
                     </div>

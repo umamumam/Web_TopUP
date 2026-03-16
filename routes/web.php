@@ -7,6 +7,7 @@ Route::get('/', [TopupController::class, 'index'])->name('home');
 Route::get('/game/{slug}', [TopupController::class, 'show'])->name('topup.show');
 Route::post('/topup/checkout', [TopupController::class, 'store'])->name('topup.store');
 Route::get('/topup/status/{reference_id}', [TopupController::class, 'checkStatus'])->name('topup.status');
+Route::get('/topup/status/{reference_id}/api', [TopupController::class, 'getAjaxStatus'])->name('topup.status.api');
 Route::post('/topup/status/{reference_id}/refresh', [TopupController::class, 'refreshStatus'])->name('topup.status.refresh');
 Route::post('/topup/check-id', [TopupController::class, 'validateId'])->name('topup.check-id');
 
