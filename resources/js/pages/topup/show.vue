@@ -214,7 +214,7 @@ const checkout = async () => {
                                     <div class="text-sm sm:text-base font-bold text-slate-200">
                                         Your account is <span class="text-emerald-400 font-black">{{ username }}</span> 
                                         <span v-if="regionData"> from 
-                                            <span class="text-indigo-400">{{ regionData === 'ID' ? 'Indonesia 🇮🇩' : regionData }}</span>
+                                            <span class="text-indigo-400">{{ regionData === 'ID' ? 'Indonesia 🇮🇩' : (regionData === 'Generic' ? '' : regionData) }}</span>
                                         </span>
                                     </div>
                                 </div>

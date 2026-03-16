@@ -265,24 +265,32 @@ class TopupController extends Controller
             if (isset($data['rc']) && $data['rc'] === '00') {
                 $rawName = $data['customer_name'] ?? '';
                 $username = $rawName;
-                $region = 'Generic';
+                $region = '';
 
-                // Parsing Manual jika formatnya "User ID ... / Username ... / Region = ..."
-                if (strpos($rawName, 'Username ') !== false) {
-                    preg_match('/Username (.*?) \//', $rawName, $matches);
-                    $username = $matches[1] ?? $rawName;
-                    
-                    if (strpos($rawName, 'Region = ') !== false) {
-                        preg_match('/Region = (.*)/', $rawName, $regMatches);
-                        $region = $regMatches[1] ?? '';
+                // Format: "User ID ... Zone ... / Username ... / Region = ..."
+                // Kita coba pecah berdasarkan garis miring "/"
+                $parts = explode('/', $rawName);
+                
+                foreach ($parts as $part) {
+                    $part = trim($part);
+                    if (stripos($part, 'Username ') === 0) {
+                        $username = trim(str_ireplace('Username ', '', $part));
+                    } elseif (stripos($part, 'Region =') === 0) {
+                        $region = trim(str_ireplace('Region =', '', $part));
                     }
+                }
+
+                // Jika pemecahan gagal, setidaknya tampilkan rawName
+                if ($username == $rawName && strpos($rawName, '/') !== false) {
+                     // Fallback jika format berbeda tapi ada garis miring
+                     $username = trim(explode('/', $rawName)[1] ?? $rawName);
                 }
 
                 return response()->json([
                     'success' => true,
                     'username' => $username,
                     'region' => $region,
-                    'full_data' => $rawName // Kirim data asli buat jaga-jaga
+                    'full_data' => $rawName
                 ]);
             }
 
