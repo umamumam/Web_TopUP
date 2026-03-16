@@ -49,7 +49,10 @@ class TopupController extends Controller
     public function show($slug)
     {
         $game = Game::with(['products' => function($q) {
-            $q->where('is_active', true)->orderBy('price', 'asc');
+            $q->where('is_active', true)
+              ->where('name', 'NOT LIKE', '%Cek%')
+              ->where('name', 'NOT LIKE', '%Inquiry%')
+              ->orderBy('price', 'asc');
         }])->where('slug', $slug)->firstOrFail();
 
         $paymentMethods = PaymentMethod::where('is_active', true)->get();
@@ -260,9 +263,26 @@ class TopupController extends Controller
 
             // rc '00' = sukses
             if (isset($data['rc']) && $data['rc'] === '00') {
+                $rawName = $data['customer_name'] ?? '';
+                $username = $rawName;
+                $region = 'Generic';
+
+                // Parsing Manual jika formatnya "User ID ... / Username ... / Region = ..."
+                if (strpos($rawName, 'Username ') !== false) {
+                    preg_match('/Username (.*?) \//', $rawName, $matches);
+                    $username = $matches[1] ?? $rawName;
+                    
+                    if (strpos($rawName, 'Region = ') !== false) {
+                        preg_match('/Region = (.*)/', $rawName, $regMatches);
+                        $region = $regMatches[1] ?? '';
+                    }
+                }
+
                 return response()->json([
                     'success' => true,
-                    'username' => $data['customer_name'] ?? 'Username ditemukan'
+                    'username' => $username,
+                    'region' => $region,
+                    'full_data' => $rawName // Kirim data asli buat jaga-jaga
                 ]);
             }
 

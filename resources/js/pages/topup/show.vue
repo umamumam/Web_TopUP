@@ -20,6 +20,7 @@ const form = useForm({
 });
 
 const username = ref('');
+const regionData = ref('');
 const isValidating = ref(false);
 
 const validateId = async () => {
@@ -35,6 +36,7 @@ const validateId = async () => {
 
     isValidating.value = true;
     username.value = '';
+    regionData.value = '';
 
     try {
         const response = await axios.post('/topup/check-id', {
@@ -45,10 +47,12 @@ const validateId = async () => {
 
         if (response.data.success) {
             username.value = response.data.username;
+            regionData.value = response.data.region;
             form.nickname = response.data.username;
         } else {
             // Reset nickname if validation fails
             username.value = '';
+            regionData.value = '';
             form.nickname = '';
             console.warn(response.data.message);
         }
@@ -207,8 +211,11 @@ const checkout = async () => {
                                 </div>
                                 <div>
                                     <div class="text-[10px] text-emerald-500/70 font-black uppercase tracking-[0.2em] mb-0.5">Akun Terverifikasi</div>
-                                    <div class="text-sm sm:text-base font-bold text-emerald-50">
-                                        Nickname: <span class="text-emerald-400 font-black px-1.5 py-0.5 bg-emerald-400/10 rounded-md">{{ username }}</span>
+                                    <div class="text-sm sm:text-base font-bold text-slate-200">
+                                        Your account is <span class="text-emerald-400 font-black">{{ username }}</span> 
+                                        <span v-if="regionData"> from 
+                                            <span class="text-indigo-400">{{ regionData === 'ID' ? 'Indonesia 🇮🇩' : regionData }}</span>
+                                        </span>
                                     </div>
                                 </div>
                             </div>
