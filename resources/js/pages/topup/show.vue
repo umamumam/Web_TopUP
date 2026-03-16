@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
-import { CreditCard, Wallet, Landmark, ChevronRight, CheckCircle2, QrCode, Star, MessageSquare } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { CreditCard, Wallet, Landmark, ChevronRight, CheckCircle2, QrCode, Star, MessageSquare, X, ShoppingCart, User, Server, Package, Banknote } from 'lucide-vue-next';
+import { ref, computed } from 'vue';
 import { store, status } from '@/routes/topup';
 
 const props = defineProps<{
@@ -23,8 +23,8 @@ const username = ref('');
 const regionData = ref('');
 const isValidating = ref(false);
 
-// Cache key: simpan kombinasi target_id+server_id terakhir yang sudah dicek
-// Supaya tidak mengirim ulang request ke Digiflazz jika ID tidak berubah
+// Cache key: simpan kombinasi target_id+server_id yang sudah dicek
+// Request ke Digiflazz HANYA dikirim jika key berubah
 const lastCheckedKey = ref('');
 
 const buildCheckKey = () => `${form.target_id}|${form.server_id}`;
@@ -40,11 +40,11 @@ const validateId = async () => {
         return;
     }
 
-    // ✅ Cek cache: jika ID tidak berubah sejak terakhir dicek, gunakan hasil sebelumnya
+    // ✅ FIX: Hanya bandingkan key — tidak perlu cek username.value
+    // Selama key sama, skip request (meskipun username kosong/falsy)
     const currentKey = buildCheckKey();
 
-    if (currentKey === lastCheckedKey.value && username.value) {
-        // Sudah ada hasil untuk kombinasi ini, tidak perlu request ulang
+    if (currentKey === lastCheckedKey.value) {
         return;
     }
 
@@ -63,15 +63,12 @@ const validateId = async () => {
             username.value = response.data.username;
             regionData.value = response.data.region;
             form.nickname = response.data.username;
-            // Simpan key yang berhasil dicek
-            lastCheckedKey.value = currentKey;
+            lastCheckedKey.value = currentKey; // Kunci cache disimpan setelah berhasil
         } else {
-            // Reset nickname if validation fails
             username.value = '';
             regionData.value = '';
             form.nickname = '';
-            // Reset cache key supaya bisa dicoba lagi jika user memperbaiki ID
-            lastCheckedKey.value = '';
+            lastCheckedKey.value = ''; // Reset supaya bisa coba lagi setelah ID diperbaiki
             console.warn(response.data.message);
         }
     } catch {
@@ -84,7 +81,7 @@ const validateId = async () => {
 
 // Auto validate when typing server ID if target ID is already filled
 const onServerIdInput = () => {
-    // Reset cache jika user mengetik ulang server ID (ID mungkin berubah)
+    // Jika user mengubah isi input server_id, reset cache
     if (lastCheckedKey.value && buildCheckKey() !== lastCheckedKey.value) {
         lastCheckedKey.value = '';
         username.value = '';
@@ -97,18 +94,49 @@ const onServerIdInput = () => {
     }
 };
 
-const isSubmitting = ref(false);
+// ── Popup Konfirmasi ──────────────────────────────────────────
+const showConfirm = ref(false);
 
-const checkout = async () => {
+const selectedProduct = computed(() =>
+    props.game.products.find((p: any) => p.id === form.product_id)
+);
+
+const selectedPayment = computed(() =>
+    props.paymentMethods.find((p: any) => p.id === form.payment_method_id)
+);
+
+const totalPrice = computed(() => {
+    if (!selectedProduct.value || !selectedPayment.value) {
+        return 0;
+    }
+
+    const base = selectedProduct.value.price;
+    const pm = selectedPayment.value;
+
+    if (pm.fee_percent > 0) {
+        return Math.ceil(base + (base * pm.fee_percent) / 100);
+    }
+
+    return base + pm.fee_flat;
+});
+
+const openConfirm = () => {
     if (!form.product_id || !form.payment_method_id || !form.target_id || !form.whatsapp_number) {
         alert('Mohon lengkapi semua data!');
         return;
     }
 
+    showConfirm.value = true;
+};
+
+const isSubmitting = ref(false);
+
+const confirmCheckout = async () => {
     if (isSubmitting.value) {
         return;
     }
 
+    showConfirm.value = false;
     isSubmitting.value = true;
 
     try {
@@ -402,7 +430,7 @@ const checkout = async () => {
                             </div>
 
                             <button 
-                                @click="checkout"
+                                @click="openConfirm"
                                 class="w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] hover:bg-right text-white font-black py-6 rounded-[28px] text-xl uppercase shadow-2xl shadow-indigo-500/30 active:scale-95 transition-all duration-500 flex items-center justify-center gap-4 group/btn"
                             >
                                 <span class="tracking-widest">Beli Sekarang</span>
@@ -469,6 +497,130 @@ const checkout = async () => {
             </div>
         </div>
     </div>
+
+    <!-- ── Popup Konfirmasi Pesanan ──────────────────────── -->
+    <Teleport to="body">
+        <Transition name="modal">
+            <div
+                v-if="showConfirm"
+                class="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4"
+                @click.self="showConfirm = false"
+            >
+                <!-- Backdrop -->
+                <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+
+                <!-- Modal Card -->
+                <div class="relative w-full max-w-md bg-[#12151a] border border-slate-700/60 rounded-[32px] shadow-2xl overflow-hidden">
+                    <!-- Header -->
+                    <div class="relative bg-gradient-to-br from-indigo-600 to-purple-700 px-7 pt-7 pb-10">
+                        <div class="absolute inset-0 opacity-10 bg-[url('/DIAMOND.png')] bg-center bg-no-repeat bg-[length:180px]"></div>
+                        <button
+                            @click="showConfirm = false"
+                            class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+                        >
+                            <X class="w-4 h-4 text-white" />
+                        </button>
+                        <div class="flex items-center gap-3 relative z-10">
+                            <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
+                                <ShoppingCart class="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                                <p class="text-white/70 text-[10px] font-black uppercase tracking-widest">Konfirmasi Pesanan</p>
+                                <h2 class="text-white font-black text-lg uppercase tracking-tight leading-none">{{ game.name }}</h2>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="px-7 py-6 space-y-4 -mt-4">
+                        <!-- Detail Rows -->
+                        <div class="bg-slate-900 rounded-[20px] border border-slate-800 divide-y divide-slate-800">
+                            <!-- ID Akun -->
+                            <div class="flex items-center gap-3 px-5 py-4">
+                                <div class="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                                    <User class="w-4 h-4 text-indigo-400" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">{{ game.input_label }}</p>
+                                    <p class="text-sm font-bold text-slate-200 truncate">{{ form.target_id }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Server (jika ada) -->
+                            <div v-if="game.has_server" class="flex items-center gap-3 px-5 py-4">
+                                <div class="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
+                                    <Server class="w-4 h-4 text-purple-400" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Server</p>
+                                    <p class="text-sm font-bold text-slate-200">{{ form.server_id }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Nickname (jika ada) -->
+                            <div v-if="username" class="flex items-center gap-3 px-5 py-4">
+                                <div class="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                                    <CheckCircle2 class="w-4 h-4 text-emerald-400" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Nickname</p>
+                                    <p class="text-sm font-bold text-emerald-400 truncate">{{ username }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Produk -->
+                            <div class="flex items-center gap-3 px-5 py-4">
+                                <div class="w-8 h-8 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0">
+                                    <Package class="w-4 h-4 text-yellow-400" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Produk</p>
+                                    <p class="text-sm font-bold text-slate-200 truncate">{{ selectedProduct?.name }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Metode Bayar -->
+                            <div class="flex items-center gap-3 px-5 py-4">
+                                <div class="w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center shrink-0">
+                                    <Banknote class="w-4 h-4 text-sky-400" />
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Pembayaran</p>
+                                    <p class="text-sm font-bold text-slate-200">{{ selectedPayment?.name }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Harga -->
+                        <div class="bg-indigo-600/10 border border-indigo-500/30 rounded-[20px] px-5 py-4 flex justify-between items-center">
+                            <span class="text-[10px] text-indigo-400 font-black uppercase tracking-widest">Total Bayar</span>
+                            <span class="text-xl font-black text-white tracking-tight">
+                                Rp {{ totalPrice.toLocaleString('id-ID') }}
+                            </span>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="flex gap-3 pt-1">
+                            <button
+                                @click="showConfirm = false"
+                                class="flex-1 py-4 rounded-2xl border-2 border-slate-700 text-slate-400 font-black text-xs uppercase tracking-widest hover:border-slate-600 hover:text-slate-300 transition-all active:scale-95"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                @click="confirmCheckout"
+                                :disabled="isSubmitting"
+                                class="flex-[2] py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                <span v-if="isSubmitting" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                <span>{{ isSubmitting ? 'Memproses...' : 'Konfirmasi & Bayar' }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+    </Teleport>
 </template>
 
 <style scoped>
