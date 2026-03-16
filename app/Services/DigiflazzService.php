@@ -61,6 +61,12 @@ class DigiflazzService
         return $response->json();
     }
 
+    public function checkStatus($sku, $target, $refId, $server = null)
+    {
+        // For Digiflazz, checking status is the same as placing order with same ref_id
+        return $this->placeOrder($sku, $target, $refId, $server);
+    }
+
     public function checkId($target, $sku)
     {
         $refId = 'CHECK-' . time();

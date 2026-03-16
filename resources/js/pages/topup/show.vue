@@ -23,7 +23,13 @@ const username = ref('');
 const isValidating = ref(false);
 
 const validateId = async () => {
-    if (!form.target_id || (props.game.has_server && !form.server_id)) {
+    // Only validate if target_id is present
+    if (!form.target_id) {
+        return;
+    }
+    
+    // If game has server, only validate if server_id has at least 4 digits (typical for ML)
+    if (props.game.has_server && (!form.server_id || form.server_id.length < 3)) {
         return;
     }
 
@@ -41,6 +47,9 @@ const validateId = async () => {
             username.value = response.data.username;
             form.nickname = response.data.username;
         } else {
+            // Reset nickname if validation fails
+            username.value = '';
+            form.nickname = '';
             console.warn(response.data.message);
         }
     } catch {
@@ -50,12 +59,26 @@ const validateId = async () => {
     }
 };
 
+// Auto validate when typing server ID if target ID is already filled
+const onServerIdInput = () => {
+    if (form.target_id && form.server_id.length >= 4) {
+        validateId();
+    }
+};
+
+const isSubmitting = ref(false);
+
 const checkout = async () => {
     if (!form.product_id || !form.payment_method_id || !form.target_id || !form.whatsapp_number) {
         alert('Mohon lengkapi semua data!');
-
         return;
     }
+
+    if (isSubmitting.value) {
+        return;
+    }
+
+    isSubmitting.value = true;
 
     try {
         const response = await axios.post(store.url(), form.data());
@@ -81,6 +104,8 @@ const checkout = async () => {
         }
     } catch (error: any) {
         alert(error.response?.data?.message || 'Terjadi kesalahan');
+    } finally {
+        isSubmitting.value = false;
     }
 };
 
@@ -163,6 +188,7 @@ const checkout = async () => {
                                     v-model="form.server_id"
                                     type="text" 
                                     @blur="validateId"
+                                    @input="onServerIdInput"
                                     class="w-full bg-slate-950/50 border-2 border-slate-800/80 rounded-[16px] sm:rounded-[20px] px-4 py-3 sm:px-5 sm:py-4 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none font-bold placeholder-slate-600"
                                     placeholder="1234"
                                 />
@@ -182,7 +208,7 @@ const checkout = async () => {
                                 <div>
                                     <div class="text-[10px] text-emerald-500/70 font-black uppercase tracking-[0.2em] mb-0.5">Akun Terverifikasi</div>
                                     <div class="text-sm sm:text-base font-bold text-emerald-50">
-                                        Your account is <span class="text-emerald-400 font-black px-1.5 py-0.5 bg-emerald-400/10 rounded-md">{{ username }}</span> from Indonesia 🇮🇩
+                                        Nickname: <span class="text-emerald-400 font-black px-1.5 py-0.5 bg-emerald-400/10 rounded-md">{{ username }}</span>
                                     </div>
                                 </div>
                             </div>

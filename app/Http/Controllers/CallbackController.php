@@ -54,12 +54,23 @@ class CallbackController extends Controller
 
     public function processPaidOrder($order, $digiflazz)
     {
-        if ($order->payment_status === 'paid') return;
+        // Use atomic update to prevent double processing
+        $updated = Order::where('id', $order->id)
+            ->where('payment_status', '!=', 'paid')
+            ->update([
+                'payment_status' => 'paid',
+                'status' => 'processing'
+            ]);
 
-        $order->update([
-            'payment_status' => 'paid',
-            'status' => 'processing'
-        ]);
+        if (!$updated) {
+            Log::info('Order already processed or paid: ' . $order->reference_id);
+            return;
+        }
+
+        // Refresh order object after update
+        $order->refresh();
+
+        Log::info('Processing Order to Digiflazz: ' . $order->reference_id);
 
         // Place Order to Digiflazz
         $response = $digiflazz->placeOrder(
@@ -71,13 +82,27 @@ class CallbackController extends Controller
 
         if (isset($response['data'])) {
             $data = $response['data'];
+            
+            // Map status from Digiflazz to our system
+            $newStatus = strtolower($data['status'] ?? 'pending');
+            if ($newStatus === 'gagal') $newStatus = 'failed';
+            if ($newStatus === 'sukses') $newStatus = 'success';
+
             $order->update([
-                'status' => $data['status'], // pending, success, failure
+                'status' => $newStatus,
                 'sn' => $data['sn'] ?? null,
                 'provider_payload' => json_encode($data)
             ]);
+            
+            Log::info('Digiflazz Order Placed: ' . $order->reference_id . ' Status: ' . $newStatus);
         } else {
-            Log::error('Digiflazz Order Failed: ' . json_encode($response));
+            Log::error('Digiflazz Order Failed (No Data): ' . $order->reference_id . ' Response: ' . json_encode($response));
+            
+            // If it failed to place order, we should maybe mark it as failed or keep it as processing for manual check
+            $order->update([
+                'status' => 'failed',
+                'provider_payload' => json_encode($response)
+            ]);
         }
     }
 
@@ -90,35 +115,65 @@ class CallbackController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid JSON'], 400);
         }
 
-        // Detect format: Official Digiflazz (nested in 'data') or Flat (from screenshot)
+        // 1. Signature Validation (If secret is set)
+        $secret = config('services.digiflazz.webhook_secret');
+        if ($secret) {
+            $signature = $request->header('X-Digiflazz-Signature');
+            $expectedSignature = 'sha1=' . hash_hmac('sha1', $payload, $secret);
+            
+            // Note: If Digiflazz uses a different header or algorithm, 
+            // you might need to adjust this part. 
+            // For now, we log it so we can debug if signature check fails.
+            if ($signature !== $expectedSignature) {
+                Log::warning('Digiflazz Webhook Invalid Signature', [
+                    'received' => $signature,
+                    'expected' => $expectedSignature
+                ]);
+                // return response()->json(['success' => false, 'message' => 'Invalid signature'], 403);
+            }
+        }
+
+        Log::info('Digiflazz Webhook Received', $data);
+
+        // 2. Detect format: Official Digiflazz (nested in 'data') or Flat
         if (isset($data['data'])) {
             $item = $data['data'];
             $refId = $item['ref_id'] ?? null;
             $status = $item['status'] ?? null;
             $sn = $item['sn'] ?? null;
+            $itemNickname = $item['nickname'] ?? ($item['customer_name'] ?? null);
         } else {
-            // Flat format from screenshot
-            $refId = $data['invoice_number'] ?? ($data['reference_id'] ?? null);
-            $status = strtolower($data['status_code'] ?? '');
-            $sn = $data['voucher'] ?? ($data['sn'] ?? null);
+            // Flat format / Direct
+            $refId = $data['ref_id'] ?? ($data['invoice_number'] ?? null);
+            $status = $data['status'] ?? ($data['status_code'] ?? null);
+            $sn = $data['sn'] ?? ($data['voucher'] ?? null);
+            $itemNickname = $data['nickname'] ?? ($data['customer_name'] ?? null);
         }
 
         if ($refId) {
             $order = Order::where('reference_id', $refId)->first();
             
             if ($order) {
-                $itemNickname = $data['nickname'] ?? null;
-                
-                // Map status constants if needed
-                if ($status === 'success') $status = 'success';
-                if ($status === 'failed' || $status === 'failure') $status = 'failed';
+                // Map status constants
+                $status = strtolower($status);
+                if ($status === 'success' || $status === 'sukses' || $status === '00') {
+                    $status = 'success';
+                } elseif ($status === 'failed' || $status === 'failure' || $status === 'gagal' || $status === 'error') {
+                    $status = 'failed';
+                } elseif ($status === 'pending' || $status === 'processing') {
+                    $status = 'processing';
+                }
 
+                $itemNickname = $data['nickname'] ?? ($data['customer_name'] ?? null);
+                
                 $order->update([
                     'status' => $status,
                     'sn' => $sn ?? $order->sn,
                     'nickname' => $itemNickname ?? $order->nickname,
                     'provider_payload' => $payload
                 ]);
+
+                Log::info('Digiflazz Callback Processed', ['ref_id' => $refId, 'status' => $status]);
             }
         }
 

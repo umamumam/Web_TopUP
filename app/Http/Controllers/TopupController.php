@@ -144,18 +144,49 @@ class TopupController extends Controller
     {
         $order = Order::with(['product', 'paymentMethod'])->where('reference_id', $reference_id)->firstOrFail();
 
+        // 1. If not paid yet, check Midtrans
         if ($order->payment_status !== 'paid') {
             try {
                 $status = (object) $midtrans->getTransactionStatus($reference_id);
                 $transaction = $status->transaction_status;
 
                 if ($transaction == 'settlement' || $transaction == 'capture') {
-                    // Manual process paid since callback might be blocked in local
                     app(CallbackController::class)->processPaidOrder($order, $digiflazz);
                     return back()->with('success', 'Pembayaran terverifikasi!');
                 }
             } catch (\Exception $e) {
-                return back()->with('error', 'Gagal memverifikasi: ' . $e->getMessage());
+                Log::error('RefreshStatus Midtrans Error: ' . $e->getMessage());
+            }
+        }
+
+        // 2. If already paid but Digiflazz status is not success/failed, check Digiflazz
+        if ($order->payment_status === 'paid' && !in_array($order->status, ['success', 'failed'])) {
+            try {
+                $response = $digiflazz->checkStatus(
+                    $order->product->sku,
+                    $order->target_id,
+                    $order->reference_id,
+                    $order->server_id
+                );
+
+                if (isset($response['data'])) {
+                    $item = $response['data'];
+                    
+                    // Map status
+                    $newStatus = strtolower($item['status'] ?? 'pending');
+                    if ($newStatus === 'sukses') $newStatus = 'success';
+                    if ($newStatus === 'gagal') $newStatus = 'failed';
+
+                    $order->update([
+                        'status' => $newStatus,
+                        'sn' => $item['sn'] ?? $order->sn,
+                        'provider_payload' => json_encode($item)
+                    ]);
+
+                    return back()->with('success', 'Status pesanan diperbarui!');
+                }
+            } catch (\Exception $e) {
+                Log::error('RefreshStatus Digiflazz Error: ' . $e->getMessage());
             }
         }
 
