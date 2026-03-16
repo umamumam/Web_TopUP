@@ -23,6 +23,12 @@ const username = ref('');
 const regionData = ref('');
 const isValidating = ref(false);
 
+// Cache key: simpan kombinasi target_id+server_id terakhir yang sudah dicek
+// Supaya tidak mengirim ulang request ke Digiflazz jika ID tidak berubah
+const lastCheckedKey = ref('');
+
+const buildCheckKey = () => `${form.target_id}|${form.server_id}`;
+
 const validateId = async () => {
     // Only validate if target_id is present
     if (!form.target_id) {
@@ -31,6 +37,14 @@ const validateId = async () => {
     
     // If game has server, only validate if server_id has at least 4 digits (typical for ML)
     if (props.game.has_server && (!form.server_id || form.server_id.length < 3)) {
+        return;
+    }
+
+    // ✅ Cek cache: jika ID tidak berubah sejak terakhir dicek, gunakan hasil sebelumnya
+    const currentKey = buildCheckKey();
+
+    if (currentKey === lastCheckedKey.value && username.value) {
+        // Sudah ada hasil untuk kombinasi ini, tidak perlu request ulang
         return;
     }
 
@@ -49,15 +63,20 @@ const validateId = async () => {
             username.value = response.data.username;
             regionData.value = response.data.region;
             form.nickname = response.data.username;
+            // Simpan key yang berhasil dicek
+            lastCheckedKey.value = currentKey;
         } else {
             // Reset nickname if validation fails
             username.value = '';
             regionData.value = '';
             form.nickname = '';
+            // Reset cache key supaya bisa dicoba lagi jika user memperbaiki ID
+            lastCheckedKey.value = '';
             console.warn(response.data.message);
         }
     } catch {
         console.error('Cek ID Gagal');
+        lastCheckedKey.value = '';
     } finally {
         isValidating.value = false;
     }
@@ -65,6 +84,14 @@ const validateId = async () => {
 
 // Auto validate when typing server ID if target ID is already filled
 const onServerIdInput = () => {
+    // Reset cache jika user mengetik ulang server ID (ID mungkin berubah)
+    if (lastCheckedKey.value && buildCheckKey() !== lastCheckedKey.value) {
+        lastCheckedKey.value = '';
+        username.value = '';
+        regionData.value = '';
+        form.nickname = '';
+    }
+
     if (form.target_id && form.server_id.length >= 4) {
         validateId();
     }
