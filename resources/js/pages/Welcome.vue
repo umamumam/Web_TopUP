@@ -141,10 +141,10 @@ onUnmounted(() => {
                         </Link>
                         <Link
                             href="/login"
-                            class="flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-center text-xs font-black tracking-widest text-white uppercase shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-500 active:scale-95"
+                            class="flex items-center gap-2 rounded-2xl bg-indigo-600 p-3 text-center text-xs font-black tracking-widest text-white uppercase shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-500 active:scale-95 sm:px-6 sm:py-3"
                         >
                             <LogIn class="h-4 w-4" />
-                            <!-- <span>Masuk</span> -->
+                            <span class="hidden sm:inline">Masuk</span>
                         </Link>
                     </div>
                 </div>
