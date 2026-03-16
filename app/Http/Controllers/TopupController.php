@@ -221,7 +221,19 @@ class TopupController extends Controller
         $game = Game::where('slug', $request->game_slug)->first();
         if (!$game) return response()->json(['success' => false, 'message' => 'Game tidak ditemukan']);
 
-        $product = Product::where('game_id', $game->id)->first();
+        // Cari produk yang khusus untuk pengecekan (biasanya ada kata 'Cek' atau 'Inquiry')
+        $product = Product::where('game_id', $game->id)
+            ->where(function($q) {
+                $q->where('name', 'LIKE', '%Cek%')
+                  ->orWhere('name', 'LIKE', '%Inquiry%');
+            })
+            ->first();
+
+        // Jika tidak ada produk khusus cek, ambil produk pertama sebagai fallback
+        if (!$product) {
+            $product = Product::where('game_id', $game->id)->first();
+        }
+
         if (!$product) return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan']);
 
         // Gabungkan target_id dan server_id
