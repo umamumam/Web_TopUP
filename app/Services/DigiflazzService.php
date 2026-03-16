@@ -15,15 +15,15 @@ class DigiflazzService
     {
         $this->username = config('services.digiflazz.username');
         $this->apiKey = config('services.digiflazz.api_key');
-        $this->baseUrl = config('services.digiflazz.mode') === 'production' 
-            ? 'https://api.digiflazz.com/v1' 
+        $this->baseUrl = config('services.digiflazz.mode') === 'production'
+            ? 'https://api.digiflazz.com/v1'
             : 'https://api.digiflazz.com/v1'; // Digiflazz uses same URL, different credentials or behavior based on account
     }
 
     public function getBalance()
     {
         $sign = md5($this->username . $this->apiKey . 'depo');
-        
+
         $response = Http::post($this->baseUrl . '/cek-saldo', [
             'username' => $this->username,
             'sign' => $sign
@@ -35,7 +35,7 @@ class DigiflazzService
     public function getPriceList()
     {
         $sign = md5($this->username . $this->apiKey . 'pricelist');
-        
+
         $response = Http::post($this->baseUrl . '/price-list', [
             'username' => $this->username,
             'sign' => $sign,
@@ -78,7 +78,7 @@ class DigiflazzService
 
     public function checkId($target, $sku)
     {
-        $refId = 'CHECK-' . time();
+        $refId = 'CHECK-' . uniqid();
         $sign = md5($this->username . $this->apiKey . $refId);
 
         $payload = [

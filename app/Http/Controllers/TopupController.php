@@ -20,18 +20,18 @@ class TopupController extends Controller
 {
     public function index()
     {
-        $categories = Category::with(['games' => function($q) {
+        $categories = Category::with(['games' => function ($q) {
             $q->where('is_active', true);
         }])->get();
 
         $paymentMethods = PaymentMethod::where('is_active', true)->get();
         $banners = Banner::where('is_active', true)->orderBy('order')->get();
         $popularGames = Game::where('is_active', true)->where('is_popular', true)->get();
-        
+
         $settings = Setting::whereIn('key', [
-            'social_facebook', 
-            'social_instagram', 
-            'social_youtube', 
+            'social_facebook',
+            'social_instagram',
+            'social_youtube',
             'social_whatsapp',
             'footer_description',
             'site_name'
@@ -48,11 +48,11 @@ class TopupController extends Controller
 
     public function show($slug)
     {
-        $game = Game::with(['products' => function($q) {
+        $game = Game::with(['products' => function ($q) {
             $q->where('is_active', true)
-              ->where('name', 'NOT LIKE', '%Cek%')
-              ->where('name', 'NOT LIKE', '%Inquiry%')
-              ->orderBy('price', 'asc');
+                ->where('name', 'NOT LIKE', '%Cek%')
+                ->where('name', 'NOT LIKE', '%Inquiry%')
+                ->orderBy('price', 'asc');
         }])->where('slug', $slug)->firstOrFail();
 
         $paymentMethods = PaymentMethod::where('is_active', true)->get();
@@ -226,9 +226,9 @@ class TopupController extends Controller
 
         // Cari produk yang khusus untuk pengecekan (biasanya ada kata 'Cek' atau 'Inquiry')
         $product = Product::where('game_id', $game->id)
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->where('name', 'LIKE', '%Cek%')
-                  ->orWhere('name', 'LIKE', '%Inquiry%');
+                    ->orWhere('name', 'LIKE', '%Inquiry%');
             })
             ->first();
 
@@ -240,8 +240,8 @@ class TopupController extends Controller
         if (!$product) return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan']);
 
         // Gabungkan target_id dan server_id
-        $customerNo = $request->server_id 
-            ? $request->target_id . $request->server_id 
+        $customerNo = $request->server_id
+            ? $request->target_id . $request->server_id
             : $request->target_id;
 
         Log::info('[ValidateId] Checking', [
@@ -263,27 +263,22 @@ class TopupController extends Controller
 
             // rc '00' = sukses
             if (isset($data['rc']) && $data['rc'] === '00') {
-                $rawName = $data['customer_name'] ?? '';
+                // Data username ada di 'sn', bukan 'customer_name'
+                $rawName = $data['sn'] ?? $data['customer_name'] ?? '';
                 $username = $rawName;
                 $region = '';
 
-                // Format: "User ID ... Zone ... / Username ... / Region = ..."
-                // Kita coba pecah berdasarkan garis miring "/"
+                // Format: "User ID xxx Zone xxx / Username xxx / Region = ID"
                 $parts = explode('/', $rawName);
-                
+
                 foreach ($parts as $part) {
                     $part = trim($part);
                     if (stripos($part, 'Username ') === 0) {
                         $username = trim(str_ireplace('Username ', '', $part));
+                        $username = urldecode(str_replace('+', ' ', $username));
                     } elseif (stripos($part, 'Region =') === 0) {
                         $region = trim(str_ireplace('Region =', '', $part));
                     }
-                }
-
-                // Jika pemecahan gagal, setidaknya tampilkan rawName
-                if ($username == $rawName && strpos($rawName, '/') !== false) {
-                     // Fallback jika format berbeda tapi ada garis miring
-                     $username = trim(explode('/', $rawName)[1] ?? $rawName);
                 }
 
                 return response()->json([
