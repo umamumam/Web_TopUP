@@ -160,6 +160,7 @@ class TopupController extends Controller
     private function syncOrder($reference_id, $midtrans, $digiflazz)
     {
         $order = Order::with(['product'])->where('reference_id', $reference_id)->firstOrFail();
+        $justPaid = false;
 
         // 1. Check Midtrans if not paid
         if ($order->payment_status !== 'paid') {
@@ -167,16 +168,19 @@ class TopupController extends Controller
                 $status = (object) $midtrans->getTransactionStatus($reference_id);
                 $transaction = $status->transaction_status;
                 if ($transaction == 'settlement' || $transaction == 'capture') {
+                    // This will trigger the FIRST Digiflazz order
                     app(CallbackController::class)->processPaidOrder($order, $digiflazz);
                     $order->refresh();
+                    $justPaid = true;
                 }
             } catch (\Exception $e) {
                 Log::error('Sync Midtrans Error: ' . $e->getMessage());
             }
         }
 
-        // 2. Check Digiflazz if paid but pending
-        if ($order->payment_status === 'paid' && !in_array($order->status, ['success', 'failed'])) {
+        // 2. Check Digiflazz ONLY IF it was already paid before this sync cycle
+        // and status is still not final (success/failed)
+        if (!$justPaid && $order->payment_status === 'paid' && !in_array($order->status, ['success', 'failed'])) {
             try {
                 $response = $digiflazz->checkStatus(
                     $order->product->sku,
