@@ -34,7 +34,8 @@ const settingsForm = useForm({
     social_youtube: props.settings.social_youtube || '',
     social_whatsapp: props.settings.social_whatsapp || '',
     footer_description: props.settings.footer_description || '',
-    site_name: props.settings.site_name || 'VEINSTORE CLONE'
+    site_name: props.settings.site_name || 'VEINSTORE CLONE',
+    site_logo: null as File | null
 });
 
 const popularForm = useForm({
@@ -57,7 +58,9 @@ const deleteBanner = (id: number) => {
 
 
 const submitSettings = () => {
-    settingsForm.post('/admin/landing-page/settings');
+    settingsForm.post('/admin/landing-page/settings', {
+        forceFormData: true
+    });
 };
 
 const submitPopular = () => {
@@ -217,6 +220,19 @@ const toggleGame = (id: number) => {
                                     <Info class="w-4 h-4" /> Informasi Tambahan
                                 </h3>
                                 <div class="space-y-5">
+                                    <div class="space-y-1.5">
+                                        <label class="text-[10px] font-black uppercase text-slate-500 pl-2 tracking-widest">Logo Platform</label>
+                                        <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                                            <div class="w-16 h-16 rounded-xl bg-white border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                                                <img v-if="props.settings.site_logo" :src="'/storage/' + props.settings.site_logo" class="w-full h-full object-contain p-1" />
+                                                <ImageIcon v-else class="w-6 h-6 text-slate-300" />
+                                            </div>
+                                            <div class="flex-grow">
+                                                <input @input="(settingsForm as any).site_logo = ($event.target as HTMLInputElement).files?.[0] || null" type="file" class="w-full text-xs text-slate-500 file:bg-indigo-50 file:border-none file:px-4 file:py-2 file:rounded-lg file:text-indigo-600 file:font-black file:uppercase file:mr-4" />
+                                                <p class="mt-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest">Rekomendasi: 512x512px (Transparent PNG/WebP)</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="space-y-1.5">
                                         <label class="text-[10px] font-black uppercase text-slate-500 pl-2 tracking-widest">Nama Platform</label>
                                         <input v-model="settingsForm.site_name" type="text" class="w-full bg-slate-50 border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 transition-all" />

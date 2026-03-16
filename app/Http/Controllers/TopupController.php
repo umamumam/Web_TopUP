@@ -34,7 +34,8 @@ class TopupController extends Controller
             'social_youtube',
             'social_whatsapp',
             'footer_description',
-            'site_name'
+            'site_name',
+            'site_logo'
         ])->get()->pluck('value', 'key');
 
         return Inertia::render('Welcome', [

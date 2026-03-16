@@ -24,7 +24,8 @@ class LandingPageController extends Controller
                 'social_youtube', 
                 'social_whatsapp',
                 'footer_description',
-                'site_name'
+                'site_name',
+                'site_logo'
             ])->get()->pluck('value', 'key')
         ]);
     }
@@ -78,6 +79,10 @@ class LandingPageController extends Controller
 
     public function updateSettings(Request $request)
     {
+        $request->validate([
+            'site_logo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:1024'
+        ]);
+
         $settings = $request->only([
             'social_facebook', 
             'social_instagram', 
@@ -86,6 +91,17 @@ class LandingPageController extends Controller
             'footer_description',
             'site_name'
         ]);
+
+        if ($request->hasFile('site_logo')) {
+            // Delete old logo if exists
+            $oldLogo = Setting::where('key', 'site_logo')->first();
+            if ($oldLogo && $oldLogo->value) {
+                Storage::disk('public')->delete($oldLogo->value);
+            }
+            
+            $path = $request->file('site_logo')->store('logo', 'public');
+            Setting::updateOrCreate(['key' => 'site_logo'], ['value' => $path]);
+        }
 
         foreach ($settings as $key => $value) {
             Setting::updateOrCreate(['key' => $key], ['value' => $value]);

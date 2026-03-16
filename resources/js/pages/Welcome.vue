@@ -93,9 +93,11 @@ onUnmounted(() => {
                     <!-- Logo -->
                     <Link href="/" class="flex shrink-0 items-center gap-3">
                         <div
-                            class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/20"
+                            class="flex h-10 w-10 items-center justify-center rounded-xl shadow-lg shadow-indigo-500/20 overflow-hidden"
+                            :class="settings.site_logo ? 'bg-white/10' : 'bg-gradient-to-br from-indigo-500 to-purple-600'"
                         >
-                            <Gamepad2 class="h-6 w-6 text-white" />
+                            <img v-if="settings.site_logo" :src="'/storage/' + settings.site_logo" class="h-full w-full object-contain p-1" />
+                            <Gamepad2 v-else class="h-6 w-6 text-white" />
                         </div>
                         <span
                             class="text-xl font-black tracking-tighter text-slate-50 uppercase"
@@ -392,9 +394,11 @@ onUnmounted(() => {
                     <div class="space-y-8 lg:col-span-5">
                         <Link href="/" class="flex items-center gap-3">
                             <div
-                                class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/20"
+                                class="flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg shadow-indigo-500/20 overflow-hidden"
+                                :class="settings.site_logo ? 'bg-white/10' : 'bg-gradient-to-br from-indigo-500 to-purple-600'"
                             >
-                                <Gamepad2 class="h-8 w-8 text-white" />
+                                <img v-if="settings.site_logo" :src="'/storage/' + settings.site_logo" class="h-full w-full object-contain p-1.5" />
+                                <Gamepad2 v-else class="h-8 w-8 text-white" />
                             </div>
                             <span
                                 class="text-2xl font-black tracking-tighter text-slate-50 uppercase"
