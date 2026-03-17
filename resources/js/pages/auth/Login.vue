@@ -22,14 +22,14 @@ defineProps<{
 
 <template>
     <AuthBase
-        title="Log in to your account"
-        description="Enter your email and password below to log in"
+        title="Selamat Datang Kembali"
+        description="Silakan masuk ke akun Anda untuk melanjutkan transaksi"
     >
-        <Head title="Log in" />
+        <Head title="Masuk" />
 
         <div
             v-if="status"
-            class="mb-4 text-center text-sm font-medium text-green-600"
+            class="mb-4 text-center text-sm font-bold text-emerald-400 bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/20"
         >
             {{ status }}
         </div>
@@ -42,7 +42,7 @@ defineProps<{
         >
             <div class="grid gap-6">
                 <div class="grid gap-2">
-                    <Label for="email">Email address</Label>
+                    <Label class="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1" for="email">Alamat Email</Label>
                     <Input
                         id="email"
                         type="email"
@@ -51,21 +51,22 @@ defineProps<{
                         autofocus
                         :tabindex="1"
                         autocomplete="email"
-                        placeholder="email@example.com"
+                        placeholder="nama@email.com"
+                        class="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:bg-white/10 focus:border-indigo-500 h-12 rounded-xl transition-all font-bold"
                     />
                     <InputError :message="errors.email" />
                 </div>
 
                 <div class="grid gap-2">
-                    <div class="flex items-center justify-between">
-                        <Label for="password">Password</Label>
+                    <div class="flex items-center justify-between pl-1">
+                        <Label class="text-[10px] font-black uppercase tracking-widest text-slate-400" for="password">Kata Sandi</Label>
                         <TextLink
                             v-if="canResetPassword"
                             :href="request().url"
-                            class="text-sm"
+                            class="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300"
                             :tabindex="5"
                         >
-                            Forgot password?
+                            Lupa sandi?
                         </TextLink>
                     </div>
                     <PasswordInput
@@ -74,36 +75,36 @@ defineProps<{
                         required
                         :tabindex="2"
                         autocomplete="current-password"
-                        placeholder="Password"
+                        placeholder="••••••••"
+                        class="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:bg-white/10 focus:border-indigo-500 h-12 rounded-xl transition-all font-bold"
                     />
                     <InputError :message="errors.password" />
                 </div>
 
-                <div class="flex items-center justify-between">
-                    <Label for="remember" class="flex items-center space-x-3">
-                        <Checkbox id="remember" name="remember" :tabindex="3" />
-                        <span>Remember me</span>
+                <div class="flex items-center justify-between px-1">
+                    <Label for="remember" class="flex items-center space-x-3 cursor-pointer group">
+                        <Checkbox id="remember" name="remember" :tabindex="3" class="border-white/20 data-[state=checked]:bg-indigo-600" />
+                        <span class="text-xs font-bold text-slate-400 group-hover:text-slate-300 transition-colors">Ingat saya</span>
                     </Label>
                 </div>
 
                 <Button
                     type="submit"
-                    class="mt-4 w-full"
+                    class="mt-4 w-full h-14 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-sm font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-500/20 border-none transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                     :tabindex="4"
                     :disabled="processing"
-                    data-test="login-button"
                 >
-                    <Spinner v-if="processing" />
-                    Log in
+                    <Spinner v-if="processing" class="mr-2" />
+                    Masuk Sekarang
                 </Button>
             </div>
 
             <div
-                class="text-center text-sm text-muted-foreground"
+                class="text-center text-xs font-bold text-slate-500"
                 v-if="canRegister"
             >
-                Don't have an account?
-                <TextLink :href="register().url" :tabindex="5">Sign up</TextLink>
+                Belum punya akun?
+                <TextLink :href="register().url" :tabindex="5" class="text-white hover:text-indigo-400 ml-1">Daftar Gratis</TextLink>
             </div>
         </Form>
     </AuthBase>

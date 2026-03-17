@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
+import { Form, Head, Link } from '@inertiajs/vue3';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
-import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,10 +13,10 @@ import { store } from '@/routes/register';
 
 <template>
     <AuthBase
-        title="Create an account"
-        description="Enter your details below to create your account"
+        title="Daftar Akun Baru"
+        description="Lengkapi data diri Anda untuk bergabung menjadi member"
     >
-        <Head title="Register" />
+        <Head title="Daftar" />
 
         <Form
             v-bind="store.form()"
@@ -27,7 +26,7 @@ import { store } from '@/routes/register';
         >
             <div class="grid gap-6">
                 <div class="grid gap-2">
-                    <Label for="name">Name</Label>
+                    <Label class="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1" for="name">Nama Lengkap</Label>
                     <Input
                         id="name"
                         type="text"
@@ -36,13 +35,14 @@ import { store } from '@/routes/register';
                         :tabindex="1"
                         autocomplete="name"
                         name="name"
-                        placeholder="Full name"
+                        placeholder="Masukkan nama lengkap"
+                        class="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:bg-white/10 focus:border-indigo-500 h-12 rounded-xl transition-all font-bold"
                     />
                     <InputError :message="errors.name" />
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="email">Email address</Label>
+                    <Label class="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1" for="email">Alamat Email</Label>
                     <Input
                         id="email"
                         type="email"
@@ -50,56 +50,58 @@ import { store } from '@/routes/register';
                         :tabindex="2"
                         autocomplete="email"
                         name="email"
-                        placeholder="email@example.com"
+                        placeholder="nama@email.com"
+                        class="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:bg-white/10 focus:border-indigo-500 h-12 rounded-xl transition-all font-bold"
                     />
                     <InputError :message="errors.email" />
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="password">Password</Label>
+                    <Label class="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1" for="password">Kata Sandi</Label>
                     <PasswordInput
                         id="password"
                         required
                         :tabindex="3"
                         autocomplete="new-password"
                         name="password"
-                        placeholder="Password"
+                        placeholder="••••••••"
+                        class="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:bg-white/10 focus:border-indigo-500 h-12 rounded-xl transition-all font-bold"
                     />
                     <InputError :message="errors.password" />
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="password_confirmation">Confirm password</Label>
+                    <Label class="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1" for="password_confirmation">Konfirmasi Sandi</Label>
                     <PasswordInput
                         id="password_confirmation"
                         required
                         :tabindex="4"
                         autocomplete="new-password"
                         name="password_confirmation"
-                        placeholder="Confirm password"
+                        placeholder="••••••••"
+                        class="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:bg-white/10 focus:border-indigo-500 h-12 rounded-xl transition-all font-bold"
                     />
                     <InputError :message="errors.password_confirmation" />
                 </div>
 
                 <Button
                     type="submit"
-                    class="mt-2 w-full"
+                    class="mt-4 w-full h-14 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-sm font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-500/20 border-none transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                     tabindex="5"
                     :disabled="processing"
-                    data-test="register-user-button"
                 >
-                    <Spinner v-if="processing" />
-                    Create account
+                    <Spinner v-if="processing" class="mr-2" />
+                    Buat Akun Sekarang
                 </Button>
             </div>
 
-            <div class="text-center text-sm text-muted-foreground">
-                Already have an account?
-                <TextLink
+            <div class="text-center text-xs font-bold text-slate-500">
+                Sudah punya akun?
+                <Link
                     :href="login().url"
-                    class="underline underline-offset-4"
+                    class="text-white hover:text-indigo-400 ml-1 transition-colors"
                     :tabindex="6"
-                    >Log in</TextLink
+                    >Masuk Disini</Link
                 >
             </div>
         </Form>
